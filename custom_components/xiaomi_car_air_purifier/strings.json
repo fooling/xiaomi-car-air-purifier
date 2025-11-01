@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "confirm": {
+        "description": "Do you want to add the Xiaomi Car Air Purifier `{name}` to Home Assistant?"
+      },
+      "user": {
+        "description": "Select your Xiaomi Car Air Purifier from the list below.",
+        "data": {
+          "device": "Device"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "no_devices_found": "No Xiaomi Car Air Purifier found.\n\nPlease ensure:\n• The device is powered on\n• Bluetooth is enabled in Home Assistant\n• The device is within range\n• The device is not connected to another device\n\nTip: The device will be automatically discovered when available. You can also check Settings → Devices & Services → Bluetooth to see discovered devices.",
+      "no_bluetooth": "Bluetooth is not enabled in Home Assistant"
+    }
+  }
+}

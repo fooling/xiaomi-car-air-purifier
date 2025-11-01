@@ -74,7 +74,16 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         current_addresses = self._async_current_ids()
-        for discovery in async_discovered_service_info(self.hass, False):
+
+        # Get all discovered Bluetooth devices
+        discovered = async_discovered_service_info(self.hass, False)
+
+        _LOGGER.debug(
+            "Found %d total bluetooth devices during manual setup",
+            len(list(discovered))
+        )
+
+        for discovery in discovered:
             if (
                 discovery.address in current_addresses
                 or discovery.address in self._discovered_devices
@@ -82,10 +91,22 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 continue
 
             # Check if this is a Xiaomi Car Air Purifier
-            if discovery.name and "MI-CAR" in discovery.name.upper():
-                self._discovered_devices[discovery.address] = discovery
+            # Match device name patterns
+            if discovery.name:
+                name_upper = discovery.name.upper()
+                _LOGGER.debug("Checking device: %s (%s)", discovery.name, discovery.address)
+
+                # More flexible matching
+                if any(pattern in name_upper for pattern in ["MI-CAR", "MICAR", "XIAOMI CAR"]):
+                    _LOGGER.info(
+                        "Found Xiaomi Car Air Purifier: %s (%s)",
+                        discovery.name,
+                        discovery.address
+                    )
+                    self._discovered_devices[discovery.address] = discovery
 
         if not self._discovered_devices:
+            _LOGGER.warning("No Xiaomi Car Air Purifier devices found")
             return self.async_abort(reason="no_devices_found")
 
         return self.async_show_form(

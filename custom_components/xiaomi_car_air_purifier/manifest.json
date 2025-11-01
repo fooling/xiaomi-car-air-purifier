@@ -8,7 +8,10 @@
   "config_flow": true,
   "bluetooth": [
     {
-      "local_name": "MI-CAR-*"
+      "local_name": "MI-CAR*"
+    },
+    {
+      "local_name": "MICAR*"
     }
   ],
   "iot_class": "local_polling",
