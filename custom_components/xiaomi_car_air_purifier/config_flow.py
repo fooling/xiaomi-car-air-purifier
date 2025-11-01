@@ -78,12 +78,20 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Get all discovered Bluetooth devices
         discovered = async_discovered_service_info(self.hass, False)
 
-        _LOGGER.debug(
+        discovered_list = list(discovered)
+        _LOGGER.info(
             "Found %d total bluetooth devices during manual setup",
-            len(list(discovered))
+            len(discovered_list)
         )
 
-        for discovery in discovered:
+        # Log all discovered devices for debugging
+        for i, discovery in enumerate(discovered_list[:20], 1):  # Log first 20
+            _LOGGER.info(
+                "Bluetooth device #%d: name=%s, address=%s",
+                i, discovery.name or "Unknown", discovery.address
+            )
+
+        for discovery in discovered_list:
             if (
                 discovery.address in current_addresses
                 or discovery.address in self._discovered_devices
@@ -94,10 +102,12 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Match device name patterns
             if discovery.name:
                 name_upper = discovery.name.upper()
-                _LOGGER.debug("Checking device: %s (%s)", discovery.name, discovery.address)
 
-                # More flexible matching
-                if any(pattern in name_upper for pattern in ["MI-CAR", "MICAR", "XIAOMI CAR"]):
+                # More flexible matching - match any device with "MI" or "XIAOMI"
+                if any(pattern in name_upper for pattern in [
+                    "MI-CAR", "MICAR", "XIAOMI CAR", "MI CAR",
+                    "XIAOMI-CAR", "XMCAR", "米家车载"
+                ]):
                     _LOGGER.info(
                         "Found Xiaomi Car Air Purifier: %s (%s)",
                         discovery.name,
@@ -106,8 +116,9 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self._discovered_devices[discovery.address] = discovery
 
         if not self._discovered_devices:
-            _LOGGER.warning("No Xiaomi Car Air Purifier devices found")
-            return self.async_abort(reason="no_devices_found")
+            _LOGGER.warning("No Xiaomi Car Air Purifier devices found automatically")
+            # Instead of aborting, show manual entry option
+            return await self.async_step_manual()
 
         return self.async_show_form(
             step_id="user",
@@ -121,4 +132,52 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                 }
             ),
+        )
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle manual device entry."""
+        errors = {}
+
+        if user_input is not None:
+            address = user_input["address"].strip().upper()
+
+            # Validate MAC address format
+            import re
+            if not re.match(r'^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$', address):
+                errors["address"] = "invalid_mac"
+            else:
+                # Normalize MAC address format
+                address = address.replace("-", ":")
+
+                await self.async_set_unique_id(address, raise_on_progress=False)
+                self._abort_if_unique_id_configured()
+
+                # Try to find the device in discovered devices
+                discovered = async_discovered_service_info(self.hass, False)
+                for discovery in discovered:
+                    if discovery.address.upper() == address:
+                        self._discovery_info = discovery
+                        return self.async_create_entry(
+                            title=discovery.name or address,
+                            data={},
+                        )
+
+                # Device not found in discovery, but create entry anyway
+                # It may be powered off now but will connect later
+                _LOGGER.info("Creating entry for device not currently discovered: %s", address)
+                return self.async_create_entry(
+                    title=f"Xiaomi Car Purifier ({address})",
+                    data={},
+                )
+
+        return self.async_show_form(
+            step_id="manual",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("address"): str,
+                }
+            ),
+            errors=errors,
         )

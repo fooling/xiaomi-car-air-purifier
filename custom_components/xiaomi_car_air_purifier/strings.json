@@ -9,7 +9,17 @@
         "data": {
           "device": "Device"
         }
+      },
+      "manual": {
+        "title": "Add Device Manually",
+        "description": "No devices found automatically. You can manually enter the Bluetooth MAC address of your Xiaomi Car Air Purifier.\n\nTo find the MAC address:\n1. Check Settings → Devices & Services → Bluetooth in Home Assistant\n2. Or use a Bluetooth scanner app on your phone\n3. Look for a device named like 'MI-CAR' or similar\n\nExample format: AA:BB:CC:DD:EE:FF",
+        "data": {
+          "address": "Bluetooth MAC Address"
+        }
       }
+    },
+    "error": {
+      "invalid_mac": "Invalid MAC address format. Please use format like AA:BB:CC:DD:EE:FF"
     },
     "abort": {
       "already_configured": "Device is already configured",
