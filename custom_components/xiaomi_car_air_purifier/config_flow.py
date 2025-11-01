@@ -76,7 +76,7 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         current_addresses = self._async_current_ids()
 
         # Get all discovered Bluetooth devices
-        discovered = async_discovered_service_info(self.hass, False)
+        discovered = async_discovered_service_info(self.hass)
 
         discovered_list = list(discovered)
         _LOGGER.info(
@@ -155,7 +155,7 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
 
                 # Try to find the device in discovered devices
-                discovered = async_discovered_service_info(self.hass, False)
+                discovered = async_discovered_service_info(self.hass)
                 for discovery in discovered:
                     if discovery.address.upper() == address:
                         self._discovery_info = discovery
