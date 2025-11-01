@@ -1,0 +1,16 @@
+{
+  "domain": "xiaomi_car_air_purifier",
+  "name": "Xiaomi Car Air Purifier",
+  "documentation": "https://github.com/fooling/xiaomi-car-air-purifier",
+  "codeowners": ["@fooling"],
+  "requirements": ["bleak>=0.19.0"],
+  "dependencies": [],
+  "config_flow": true,
+  "bluetooth": [
+    {
+      "local_name": "MI-CAR-*"
+    }
+  ],
+  "iot_class": "local_polling",
+  "version": "0.1.0"
+}
