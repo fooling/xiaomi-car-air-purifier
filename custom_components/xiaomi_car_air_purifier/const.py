@@ -36,6 +36,10 @@ MODE_VALUES = {
 UPDATE_INTERVAL = 30  # seconds
 DEFAULT_SCAN_INTERVAL = 30  # seconds
 
+# Connection stability settings
+MAX_RETRIES = 3  # Number of retries for operations
+CONSECUTIVE_FAILURES_THRESHOLD = 5  # Number of consecutive failures before marking unavailable
+
 # Configuration
 CONF_MAC_ADDRESS = "mac_address"
 CONF_SCAN_INTERVAL = "scan_interval"
