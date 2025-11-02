@@ -13,7 +13,7 @@ from homeassistant.components.bluetooth import (
 )
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,6 +27,13 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
+
+    @staticmethod
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Get the options flow for this handler."""
+        return XiaomiCarAirPurifierOptionsFlow(config_entry)
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -61,17 +68,49 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the user step to pick discovered device."""
+        errors = {}
+
         if user_input is not None:
             address = user_input["device"]
-            await self.async_set_unique_id(address, raise_on_progress=False)
-            self._abort_if_unique_id_configured()
 
-            self._discovery_info = self._discovered_devices[address]
+            # If manual input, validate MAC address format
+            if address not in self._discovered_devices:
+                address = address.strip().upper()
 
-            return self.async_create_entry(
-                title=self._discovery_info.name or address,
-                data={},
-            )
+                # Validate MAC address format
+                import re
+                if not re.match(r'^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$', address):
+                    errors["device"] = "invalid_mac"
+                else:
+                    # Normalize MAC address format
+                    address = address.replace("-", ":")
+
+            if not errors:
+                await self.async_set_unique_id(address, raise_on_progress=False)
+                self._abort_if_unique_id_configured()
+
+                # Try to get device info from discovered devices
+                if address in self._discovered_devices:
+                    self._discovery_info = self._discovered_devices[address]
+                    title = self._discovery_info.name or address
+                else:
+                    # Try to find in all discovered devices
+                    discovered = async_discovered_service_info(self.hass)
+                    for discovery in discovered:
+                        if discovery.address.upper() == address:
+                            self._discovery_info = discovery
+                            title = discovery.name or address
+                            break
+                    else:
+                        # Device not found, create entry anyway
+                        title = f"Xiaomi Car Purifier ({address})"
+                        _LOGGER.info("Creating entry for device not currently discovered: %s", address)
+
+                return self.async_create_entry(
+                    title=title,
+                    data={},
+                    options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
+                )
 
         current_addresses = self._async_current_ids()
 
@@ -115,23 +154,27 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                     self._discovered_devices[discovery.address] = discovery
 
-        if not self._discovered_devices:
+        # Build data schema based on discovered devices
+        if self._discovered_devices:
+            # Show dropdown with discovered devices
+            device_options = {
+                address: f"{discovery.name} ({address})"
+                for address, discovery in self._discovered_devices.items()
+            }
+            data_schema = vol.Schema({
+                vol.Required("device"): vol.In(device_options)
+            })
+        else:
+            # Show text input for manual entry
             _LOGGER.warning("No Xiaomi Car Air Purifier devices found automatically")
-            # Instead of aborting, show manual entry option
-            return await self.async_step_manual()
+            data_schema = vol.Schema({
+                vol.Required("device"): str
+            })
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("device"): vol.In(
-                        {
-                            address: f"{discovery.name} ({address})"
-                            for address, discovery in self._discovered_devices.items()
-                        }
-                    )
-                }
-            ),
+            data_schema=data_schema,
+            errors=errors,
         )
 
     async def async_step_manual(
@@ -180,4 +223,36 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+
+class XiaomiCarAirPurifierOptionsFlow(config_entries.OptionsFlow):
+    """Handle options flow for Xiaomi Car Air Purifier."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        # Get current scan interval or use default
+        current_scan_interval = self.config_entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_SCAN_INTERVAL,
+                        default=current_scan_interval,
+                    ): vol.All(vol.Coerce(int), vol.Range(min=10, max=600))
+                }
+            ),
         )
