@@ -7,6 +7,7 @@ from typing import Any
 from bleak import BleakClient
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
+from bleak_retry_connector import establish_connection
 
 from .const import (
     MODE_CHAR_UUID,
@@ -32,8 +33,9 @@ class XiaomiCarAirPurifierBLEClient:
         """Connect to the device."""
         try:
             _LOGGER.debug("Connecting to %s", self._device.address)
-            self._client = BleakClient(self._device)
-            await self._client.connect()
+            self._client = await establish_connection(
+                BleakClient, self._device, self._device.address
+            )
             _LOGGER.info("Connected to %s", self._device.address)
             return True
         except BleakError as err:
