@@ -14,7 +14,7 @@ from .coordinator import XiaomiCarAirPurifierCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SWITCH, Platform.FAN]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.FAN]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
