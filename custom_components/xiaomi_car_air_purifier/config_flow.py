@@ -112,47 +112,56 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
                 )
 
+        # Rebuild discovered devices list every time to get fresh data
+        self._discovered_devices = {}
         current_addresses = self._async_current_ids()
 
         # Get all discovered Bluetooth devices
-        discovered = async_discovered_service_info(self.hass)
+        discovered = async_discovered_service_info(self.hass, connectable=False)
 
         discovered_list = list(discovered)
-        _LOGGER.info(
+        _LOGGER.debug(
             "Found %d total bluetooth devices during manual setup",
             len(discovered_list)
         )
 
-        # Log all discovered devices for debugging
-        for i, discovery in enumerate(discovered_list[:20], 1):  # Log first 20
-            _LOGGER.info(
-                "Bluetooth device #%d: name=%s, address=%s",
-                i, discovery.name or "Unknown", discovery.address
+        # Log first 20 discovered devices for debugging
+        for i, discovery in enumerate(discovered_list[:20], 1):
+            _LOGGER.debug(
+                "Bluetooth device #%d: name='%s', address=%s",
+                i, discovery.name or "(no name)", discovery.address
             )
 
+        # Filter and collect matching devices
         for discovery in discovered_list:
-            if (
-                discovery.address in current_addresses
-                or discovery.address in self._discovered_devices
-            ):
+            # Skip already configured devices
+            if discovery.address in current_addresses:
+                _LOGGER.debug(
+                    "Skipping already configured device: %s (%s)",
+                    discovery.name or "(no name)", discovery.address
+                )
                 continue
 
-            # Check if this is a Xiaomi Car Air Purifier
-            # Match device name patterns
+            # Check if this is a Xiaomi Car Air Purifier by name
             if discovery.name:
                 name_upper = discovery.name.upper()
 
-                # More flexible matching - match any device with "MI" or "XIAOMI"
+                # Match device name patterns from manifest.json
                 if any(pattern in name_upper for pattern in [
                     "MI-CAR", "MICAR", "XIAOMI CAR", "MI CAR",
                     "XIAOMI-CAR", "XMCAR", "米家车载"
                 ]):
                     _LOGGER.info(
-                        "Found Xiaomi Car Air Purifier: %s (%s)",
+                        "Found matching Xiaomi Car Air Purifier: '%s' (%s)",
                         discovery.name,
                         discovery.address
                     )
                     self._discovered_devices[discovery.address] = discovery
+
+        _LOGGER.info(
+            "Collected %d matching Xiaomi Car Air Purifier device(s)",
+            len(self._discovered_devices)
+        )
 
         # Build data schema based on discovered devices
         if self._discovered_devices:
@@ -161,20 +170,27 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 address: f"{discovery.name} ({address})"
                 for address, discovery in self._discovered_devices.items()
             }
+            _LOGGER.debug("Device options for dropdown: %s", device_options)
             data_schema = vol.Schema({
                 vol.Required("device"): vol.In(device_options)
             })
         else:
             # Show text input for manual entry
-            _LOGGER.warning("No Xiaomi Car Air Purifier devices found automatically")
+            _LOGGER.warning(
+                "No Xiaomi Car Air Purifier devices found automatically. "
+                "Showing manual entry form. Check that device is powered on and in range."
+            )
             data_schema = vol.Schema({
-                vol.Required("device"): str
+                vol.Required("device", description={"suggested_value": ""}): str
             })
 
         return self.async_show_form(
             step_id="user",
             data_schema=data_schema,
             errors=errors,
+            description_placeholders={
+                "device_count": str(len(self._discovered_devices))
+            }
         )
 
     async def async_step_manual(
