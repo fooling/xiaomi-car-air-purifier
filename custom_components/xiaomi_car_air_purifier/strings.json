@@ -5,9 +5,9 @@
         "description": "Do you want to add the Xiaomi Car Air Purifier `{name}` to Home Assistant?"
       },
       "user": {
-        "description": "Select your Xiaomi Car Air Purifier from the list below.",
+        "description": "Select your Xiaomi Car Air Purifier from the dropdown list, or manually enter the Bluetooth MAC address if your device is not listed.\n\nExample MAC address format: AA:BB:CC:DD:EE:FF",
         "data": {
-          "device": "Device"
+          "device": "Device / MAC Address"
         }
       },
       "manual": {
@@ -25,6 +25,17 @@
       "already_configured": "Device is already configured",
       "no_devices_found": "No Xiaomi Car Air Purifier found.\n\nPlease ensure:\n• The device is powered on\n• Bluetooth is enabled in Home Assistant\n• The device is within range\n• The device is not connected to another device\n\nTip: The device will be automatically discovered when available. You can also check Settings → Devices & Services → Bluetooth to see discovered devices.",
       "no_bluetooth": "Bluetooth is not enabled in Home Assistant"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Xiaomi Car Air Purifier Options",
+        "description": "Configure options for your Xiaomi Car Air Purifier.",
+        "data": {
+          "scan_interval": "Scan Interval (seconds, 10-600)"
+        }
+      }
     }
   }
 }

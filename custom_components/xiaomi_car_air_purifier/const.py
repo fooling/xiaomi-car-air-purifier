@@ -34,6 +34,8 @@ MODE_VALUES = {
 
 # Update interval
 UPDATE_INTERVAL = 30  # seconds
+DEFAULT_SCAN_INTERVAL = 30  # seconds
 
 # Configuration
 CONF_MAC_ADDRESS = "mac_address"
+CONF_SCAN_INTERVAL = "scan_interval"

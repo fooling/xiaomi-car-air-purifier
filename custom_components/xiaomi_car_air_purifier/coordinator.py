@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .ble_client import XiaomiCarAirPurifierBLEClient
-from .const import DOMAIN, UPDATE_INTERVAL
+from .const import DOMAIN, UPDATE_INTERVAL, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,17 +20,27 @@ class XiaomiCarAirPurifierCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the coordinator."""
+        # Get scan interval from options or use default
+        scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=UPDATE_INTERVAL),
+            update_interval=timedelta(seconds=scan_interval),
         )
         self.entry = entry
         self._ble_device = bluetooth.async_ble_device_from_address(
             hass, entry.unique_id
         )
         self._client = XiaomiCarAirPurifierBLEClient(self._ble_device)
+        entry.async_on_unload(entry.add_update_listener(self._async_update_listener))
+
+    async def _async_update_listener(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        """Handle options update."""
+        # Update scan interval when options change
+        scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        self.update_interval = timedelta(seconds=scan_interval)
 
     async def _async_update_data(self) -> dict:
         """Fetch data from the device."""
