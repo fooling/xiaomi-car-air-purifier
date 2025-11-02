@@ -112,47 +112,56 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
                 )
 
+        # Rebuild discovered devices list every time to get fresh data
+        self._discovered_devices = {}
         current_addresses = self._async_current_ids()
 
-        # Get all discovered Bluetooth devices
+        # Get ALL discovered Bluetooth devices (not just those matching our manifest)
+        # This allows users to manually select devices even if the name doesn't match our patterns
         discovered = async_discovered_service_info(self.hass)
 
         discovered_list = list(discovered)
         _LOGGER.info(
-            "Found %d total bluetooth devices during manual setup",
+            "Scanning for devices: found %d total bluetooth devices",
             len(discovered_list)
         )
 
-        # Log all discovered devices for debugging
-        for i, discovery in enumerate(discovered_list[:20], 1):  # Log first 20
+        # Log first 30 discovered devices for debugging
+        for i, discovery in enumerate(discovered_list[:30], 1):
             _LOGGER.info(
-                "Bluetooth device #%d: name=%s, address=%s",
-                i, discovery.name or "Unknown", discovery.address
+                "  Device #%d: name='%s', address=%s",
+                i, discovery.name or "(no name)", discovery.address
             )
 
+        # Filter and collect matching devices
         for discovery in discovered_list:
-            if (
-                discovery.address in current_addresses
-                or discovery.address in self._discovered_devices
-            ):
+            # Skip already configured devices
+            if discovery.address in current_addresses:
+                _LOGGER.debug(
+                    "Skipping already configured device: %s (%s)",
+                    discovery.name or "(no name)", discovery.address
+                )
                 continue
 
-            # Check if this is a Xiaomi Car Air Purifier
-            # Match device name patterns
+            # Include ALL devices with a name for manual selection
+            # This allows users to select even if the name pattern doesn't match exactly
             if discovery.name:
-                name_upper = discovery.name.upper()
+                _LOGGER.info(
+                    "Adding device to list: '%s' (%s)",
+                    discovery.name,
+                    discovery.address
+                )
+                self._discovered_devices[discovery.address] = discovery
+            else:
+                _LOGGER.debug(
+                    "Skipping device without name: %s",
+                    discovery.address
+                )
 
-                # More flexible matching - match any device with "MI" or "XIAOMI"
-                if any(pattern in name_upper for pattern in [
-                    "MI-CAR", "MICAR", "XIAOMI CAR", "MI CAR",
-                    "XIAOMI-CAR", "XMCAR", "米家车载"
-                ]):
-                    _LOGGER.info(
-                        "Found Xiaomi Car Air Purifier: %s (%s)",
-                        discovery.name,
-                        discovery.address
-                    )
-                    self._discovered_devices[discovery.address] = discovery
+        _LOGGER.info(
+            "Collected %d matching Xiaomi Car Air Purifier device(s)",
+            len(self._discovered_devices)
+        )
 
         # Build data schema based on discovered devices
         if self._discovered_devices:
@@ -161,20 +170,27 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 address: f"{discovery.name} ({address})"
                 for address, discovery in self._discovered_devices.items()
             }
+            _LOGGER.debug("Device options for dropdown: %s", device_options)
             data_schema = vol.Schema({
                 vol.Required("device"): vol.In(device_options)
             })
         else:
             # Show text input for manual entry
-            _LOGGER.warning("No Xiaomi Car Air Purifier devices found automatically")
+            _LOGGER.warning(
+                "No Xiaomi Car Air Purifier devices found automatically. "
+                "Showing manual entry form. Check that device is powered on and in range."
+            )
             data_schema = vol.Schema({
-                vol.Required("device"): str
+                vol.Required("device", description={"suggested_value": ""}): str
             })
 
         return self.async_show_form(
             step_id="user",
             data_schema=data_schema,
             errors=errors,
+            description_placeholders={
+                "device_count": str(len(self._discovered_devices))
+            }
         )
 
     async def async_step_manual(
