@@ -116,19 +116,20 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_devices = {}
         current_addresses = self._async_current_ids()
 
-        # Get all discovered Bluetooth devices
-        discovered = async_discovered_service_info(self.hass, connectable=False)
+        # Get ALL discovered Bluetooth devices (not just those matching our manifest)
+        # This allows users to manually select devices even if the name doesn't match our patterns
+        discovered = async_discovered_service_info(self.hass)
 
         discovered_list = list(discovered)
-        _LOGGER.debug(
-            "Found %d total bluetooth devices during manual setup",
+        _LOGGER.info(
+            "Scanning for devices: found %d total bluetooth devices",
             len(discovered_list)
         )
 
-        # Log first 20 discovered devices for debugging
-        for i, discovery in enumerate(discovered_list[:20], 1):
-            _LOGGER.debug(
-                "Bluetooth device #%d: name='%s', address=%s",
+        # Log first 30 discovered devices for debugging
+        for i, discovery in enumerate(discovered_list[:30], 1):
+            _LOGGER.info(
+                "  Device #%d: name='%s', address=%s",
                 i, discovery.name or "(no name)", discovery.address
             )
 
@@ -142,21 +143,20 @@ class XiaomiCarAirPurifierConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 continue
 
-            # Check if this is a Xiaomi Car Air Purifier by name
+            # Include ALL devices with a name for manual selection
+            # This allows users to select even if the name pattern doesn't match exactly
             if discovery.name:
-                name_upper = discovery.name.upper()
-
-                # Match device name patterns from manifest.json
-                if any(pattern in name_upper for pattern in [
-                    "MI-CAR", "MICAR", "XIAOMI CAR", "MI CAR",
-                    "XIAOMI-CAR", "XMCAR", "米家车载"
-                ]):
-                    _LOGGER.info(
-                        "Found matching Xiaomi Car Air Purifier: '%s' (%s)",
-                        discovery.name,
-                        discovery.address
-                    )
-                    self._discovered_devices[discovery.address] = discovery
+                _LOGGER.info(
+                    "Adding device to list: '%s' (%s)",
+                    discovery.name,
+                    discovery.address
+                )
+                self._discovered_devices[discovery.address] = discovery
+            else:
+                _LOGGER.debug(
+                    "Skipping device without name: %s",
+                    discovery.address
+                )
 
         _LOGGER.info(
             "Collected %d matching Xiaomi Car Air Purifier device(s)",
